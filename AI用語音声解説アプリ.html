@@ -741,7 +741,7 @@
 
   <!-- ウェイクワード案内 -->
   <div class="wake-word-info">
-    <span class="wake-badge active-wake">🎙 「ナビ」で起動</span>
+    <span class="wake-badge active-wake">🎙 タップして話す→自動OFF</span>
     <span class="wake-badge">🔍 「調べて」で用語解説</span>
     <span class="wake-badge deep">🧠 「詳しく」でAI深掘り</span>
     <span class="wake-badge">🔄 「もう一度」で再読み上げ</span>
@@ -749,9 +749,9 @@
 
   <!-- メインマイクエリア -->
   <div class="mic-section">
-    <div class="term-count">収録用語: <span>257</span>件 | 音声認識: 常時待機中</div>
+    <div class="term-count">収録用語: <span>257</span>件 | タップして話しかけてください</div>
     <button class="mic-btn" id="micBtn">🎙</button>
-    <div class="mic-status" id="micStatus">タップして音声認識を開始</div>
+    <div class="mic-status" id="micStatus">🎙 タップして話しかける</div>
 
     <div class="waveform" id="waveform">
       <div class="wave-bar"></div>
@@ -968,36 +968,25 @@ function toggleMic() {
     showError('音声認識非対応ブラウザです。Chromeをお使いください。');
     return;
   }
-
-  if (shouldRestart) {
-    // ===== 停止 =====
-    shouldRestart = false;
-    clearTimeout(restartTimer);
+  // 録音中なら止める
+  if (isListening) {
     if (recognition) { try { recognition.abort(); } catch(e) {} }
-    isListening = false;
-    setStatus('idle', '待機中');
-    document.getElementById('micBtn').classList.remove('listening');
-    document.getElementById('micBtn').textContent = '🎙';
-    document.getElementById('micStatus').textContent = 'タップして音声認識を開始';
-    document.getElementById('waveform').classList.remove('listening');
-  } else {
-    // ===== 開始 =====
-    shouldRestart = true;
-    document.getElementById('micStatus').textContent = '起動中...';
-    startNewRecognition();
+    return;
   }
+  // 録音開始
+  startNewRecognition();
 }
 
 function startNewRecognition() {
-  if (!shouldRestart) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
+  if (!SpeechRecognition) return;
+
   try {
     if (recognition) { try { recognition.abort(); } catch(e) {} }
-    
+
     recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP';
-    recognition.continuous = false;   // Android では false が安定
+    recognition.continuous = false;  // 話し終わったら自動停止
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -1006,42 +995,31 @@ function startNewRecognition() {
       setStatus('listening', '🎙 聴いています...');
       document.getElementById('micBtn').classList.add('listening');
       document.getElementById('micBtn').textContent = '🔴';
-      document.getElementById('micStatus').textContent = '🎙 話しかけてください';
+      document.getElementById('micStatus').textContent = '話しかけてください...';
       document.getElementById('waveform').classList.add('listening');
     };
 
     recognition.onend = () => {
+      // 話し終わったら自動でOFF（再起動しない）
       isListening = false;
-      if (shouldRestart) {
-        // Android Chrome は一定時間で自動停止するので自動再起動
-        // 再起動中もボタンは🔴のまま維持
-        document.getElementById("micBtn").classList.add("listening");
-        document.getElementById("micBtn").textContent = "🔴";
-        document.getElementById("micStatus").textContent = "🎙 話しかけてください";
-        document.getElementById("waveform").classList.add("listening");
-        restartTimer = setTimeout(startNewRecognition, 1500);
-      } else {
-        setStatus('idle', '待機中');
-        document.getElementById('micBtn').classList.remove('listening');
-        document.getElementById('micBtn').textContent = '🎙';
-        document.getElementById('micStatus').textContent = 'タップして音声認識を開始';
-        document.getElementById('waveform').classList.remove('listening');
-      }
+      setStatus('idle', '待機中');
+      document.getElementById('micBtn').classList.remove('listening');
+      document.getElementById('micBtn').textContent = '🎙';
+      document.getElementById('micStatus').textContent = '🎙 タップして話しかける';
+      document.getElementById('waveform').classList.remove('listening');
     };
 
     recognition.onerror = (e) => {
       isListening = false;
       console.warn('SpeechRecognition error:', e.error);
       if (e.error === 'not-allowed') {
-        shouldRestart = false;
-        document.getElementById('micBtn').classList.remove('listening');
-        document.getElementById('micBtn').textContent = '🎙';
-        document.getElementById('micStatus').textContent = 'タップして音声認識を開始';
-        document.getElementById('waveform').classList.remove('listening');
         showError('マイクが拒否されました。Chromeの設定→サイトの設定→マイクで許可してください。');
         setStatus('idle', '⚠ マイク権限なし');
       }
-      // aborted/network/no-speech は onend が来るのでそちらで再起動
+      document.getElementById('micBtn').classList.remove('listening');
+      document.getElementById('micBtn').textContent = '🎙';
+      document.getElementById('micStatus').textContent = '🎙 タップして話しかける';
+      document.getElementById('waveform').classList.remove('listening');
     };
 
     let finalTranscript = '';
@@ -1068,9 +1046,10 @@ function startNewRecognition() {
 
   } catch(e) {
     console.warn('startNewRecognition error:', e);
-    if (shouldRestart) {
-      restartTimer = setTimeout(startNewRecognition, 600);
-    }
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micBtn').textContent = '🎙';
+    document.getElementById('micStatus').textContent = '🎙 タップして話しかける';
   }
 }
 
