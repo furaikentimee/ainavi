@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+d<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -862,7 +862,7 @@ let recognition = null;
 let isListening = false;
 let currentResult = null;
 let lastSpokenText = '';
-let apiKey = localStorage.getItem('anthropic_api_key') || '';
+let apiKey = localStorage.getItem('gemini_api_key') || '';
 let searchHistory = JSON.parse(localStorage.getItem('search_history') || '[]');
 let currentSpeech = null;
 let restartTimer = null;
@@ -940,7 +940,7 @@ function saveApiKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
   if (key) {
     apiKey = key;
-    localStorage.setItem('anthropic_api_key', key);
+    localStorage.setItem('gemini_api_key', key);
     updateApiStatus(true);
     showError('API Keyを保存しました ✓', 'green');
   }
