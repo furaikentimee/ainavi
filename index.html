@@ -1138,17 +1138,32 @@ function findTerm(query) {
 }
 
 function enrichTerm(t) {
-  // 表示名を整形
-  let display = t.term.replace(/\n/g, ' ');
-  // 最初の括弧前部分を取得
-  const m = display.match(/^([^（(]+)/);
-  const displayName = m ? m[1].trim() : display;
+  const display = t.term.replace(/\n/g, '');
+  // 先頭部分（英略語 or 英語名）
+  const m1 = display.match(/^([^（(]+)/);
+  const first = m1 ? m1[1].trim() : display;
+  // 日本語名（全角括弧内）
+  const m2 = display.match(/（([^）]+)）/);
+  const jpName = m2 ? m2[1].trim() : '';
+  // 英語正式名称（末尾の半角括弧内）
+  const m3 = display.match(/\(([^)]+)\)\s*$/);
+  const enFull = m3 ? m3[1].trim() : '';
 
-  // 英語名取得
-  const enM = display.match(/\(([^)]+)\)\s*$/);
-  const enName = enM ? enM[1].trim() : '';
+  // 表示名：日本語名があれば日本語名、なければ先頭
+  const displayName = jpName || first;
+  // 英略語：先頭が短い大文字 or 英語略語っぽければそのまま
+  const abbr = (first !== enFull && first.length <= 10) ? first : '';
+  // 英語正式名称
+  const enName = enFull;
 
-  return { ...t, displayName, enName };
+  // 読み上げ用テキスト生成
+  // 例：「過学習。Overfitting。Overfitting。要約...」
+  // 日本語名 → 英略語（あれば）→ 英語正式名称（略語と違う場合）→ 要約
+  let speakIntro = displayName;
+  if (abbr && abbr !== displayName) speakIntro += '。' + abbr;
+  if (enFull && enFull !== abbr) speakIntro += '。' + enFull;
+
+  return { ...t, displayName, abbr, enName, speakIntro };
 }
 
 function doSearch(query) {
@@ -1158,7 +1173,7 @@ function doSearch(query) {
   const result = findTerm(query);
   if (result) {
     showResult(result, false);
-    speak(result.displayName + '。' + result.desc);
+    speak(result.speakIntro + '。' + result.desc);
     addHistory(result.displayName, false);
     setStatus('active', '✓ 見つかりました');
   } else {
@@ -1187,7 +1202,8 @@ function showResult(result, isDeep = false) {
   badge.className = 'result-type-badge ' + (isDeep ? 'badge-deep' : 'badge-glossary');
 
   term.innerHTML = result.displayName + 
-    (result.enName ? `<span class="en">${result.enName}</span>` : '');
+    (result.abbr && result.abbr !== result.displayName ? ` <span class="en">${result.abbr}</span>` : '') +
+    (result.enName && result.enName !== result.abbr ? `<span class="en">${result.enName}</span>` : '');
 
   desc.textContent = result.desc;
 
@@ -1298,7 +1314,7 @@ function speakResult() {
     return;
   }
   if (currentResult) {
-    speak(currentResult.displayName + '。' + currentResult.desc);
+    speak(currentResult.speakIntro + '。' + currentResult.desc);
   }
 }
 
