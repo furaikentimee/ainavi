@@ -1107,43 +1107,58 @@ function processVoiceCommand(text) {
 }
 
 // =================== 用語検索 ===================
-function findTerm(query) {
-  const q = query.toLowerCase().replace(/\s+/g, '').replace(/[、。？！,.?!]/g, '');
-  if (!q) return null;
+// ひらがな→カタカナ変換
+function toKatakana(str) {
+  return str.replace(/[\u3041-\u3096]/g, c =>
+    String.fromCharCode(c.charCodeAt(0) + 0x60));
+}
+// カタカナ→ひらがな変換
+function toHiragana(str) {
+  return str.replace(/[\u30A1-\u30F6]/g, c =>
+    String.fromCharCode(c.charCodeAt(0) - 0x60));
+}
 
-  // ① 完全一致
+function findTerm(query) {
+  const raw = query.replace(/\s+/g, '').replace(/[、。？！,.?!]/g, '');
+  if (!raw) return null;
+  // ひらがな・カタカナ両方で検索できるよう変換
+  const q = toKatakana(raw).toLowerCase();
+  const qHira = toHiragana(raw).toLowerCase();
+
+  // ① 完全一致（カタカナ・ひらがな両対応）
   for (const t of TERMS) {
-    const termClean = t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, '');
-    if (termClean === q) return enrichTerm(t);
+    const termK = toKatakana(t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, ''));
+    if (termK === q || termK === qHira) return enrichTerm(t);
   }
 
-  // ② 用語名・説明文への部分一致
+  // ② 部分一致（カタカナ・ひらがな・英語・説明文）
   for (const t of TERMS) {
-    const termClean = t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, '');
+    const termK = toKatakana(t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, ''));
     const descClean = t.desc.toLowerCase().replace(/\s/g, '');
-    if (termClean.includes(q) || q.includes(termClean) ||
-        descClean.includes(q)) {
+    if (termK.includes(q) || q.includes(termK) ||
+        termK.includes(qHira) || descClean.includes(q)) {
       return enrichTerm(t);
     }
   }
 
-  // ③ 前方3文字以上の曖昧一致（短すぎるクエリは除外）
+  // ③ 前方3文字以上の曖昧一致
   if (q.length >= 3) {
     const prefix = q.substring(0, Math.min(q.length, 5));
+    const prefixH = qHira.substring(0, Math.min(qHira.length, 5));
     for (const t of TERMS) {
-      const termClean = t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, '');
-      if (termClean.includes(prefix)) return enrichTerm(t);
+      const termK = toKatakana(t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, ''));
+      if (termK.includes(prefix) || termK.includes(prefixH)) return enrichTerm(t);
     }
   }
 
-  // ④ スコアリング：クエリの文字が何文字用語名に含まれているか
+  // ④ スコアリング：カタカナ変換後に文字一致率で判定
   if (q.length >= 2) {
     let best = null, bestScore = 0;
     for (const t of TERMS) {
-      const termClean = t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, '');
+      const termK = toKatakana(t.term.toLowerCase().replace(/[（）\(\)\s\n]/g, ''));
       let score = 0;
       for (let i = 0; i < q.length; i++) {
-        if (termClean.includes(q[i])) score++;
+        if (termK.includes(q[i])) score++;
       }
       const ratio = score / q.length;
       if (ratio >= 0.6 && score > bestScore) {
@@ -1156,6 +1171,7 @@ function findTerm(query) {
 
   return null;
 }
+
 
 function enrichTerm(t) {
   const display = t.term.replace(/\n/g, '');
