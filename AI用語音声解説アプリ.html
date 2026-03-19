@@ -1014,7 +1014,12 @@ function startNewRecognition() {
       isListening = false;
       if (shouldRestart) {
         // Android Chrome は一定時間で自動停止するので自動再起動
-        restartTimer = setTimeout(startNewRecognition, 250);
+        // 再起動中もボタンは🔴のまま維持
+        document.getElementById("micBtn").classList.add("listening");
+        document.getElementById("micBtn").textContent = "🔴";
+        document.getElementById("micStatus").textContent = "🎙 話しかけてください";
+        document.getElementById("waveform").classList.add("listening");
+        restartTimer = setTimeout(startNewRecognition, 1500);
       } else {
         setStatus('idle', '待機中');
         document.getElementById('micBtn').classList.remove('listening');
